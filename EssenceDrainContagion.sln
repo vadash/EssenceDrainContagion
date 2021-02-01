@@ -1,0 +1,16 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EssenceDrainContagion", "EssenceDrainContagion.csproj", "{D13AAB32-4C49-46C8-8B1F-1887CAEA3825}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D13AAB32-4C49-46C8-8B1F-1887CAEA3825}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D13AAB32-4C49-46C8-8B1F-1887CAEA3825}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D13AAB32-4C49-46C8-8B1F-1887CAEA3825}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D13AAB32-4C49-46C8-8B1F-1887CAEA3825}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
