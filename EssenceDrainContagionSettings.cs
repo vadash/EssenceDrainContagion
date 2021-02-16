@@ -7,9 +7,9 @@ namespace EssenceDrainContagion
     public class EssenceDrainContagionSettings : ISettings
     {
         public HotkeyNode AimKey { get; set; } = Keys.RButton;
-        public HotkeyNode ContagionKey { get; set; } = Keys.Z;
-        public HotkeyNode EssenceDrainKey { get; set; } = Keys.R;
-        public RangeNode<int> AimRange { get; set; } = new RangeNode<int>(600, 1, 1000);
+        public HotkeyNode ContagionKey { get; set; } = Keys.Q;
+        public HotkeyNode EssenceDrainKey { get; set; } = Keys.W;
+        public RangeNode<int> AimRangeGrid { get; set; } = new RangeNode<int>(100, 40, 200);
         public RangeNode<int> AimLoopDelay { get; set; } = new RangeNode<int>(124, 1, 200);
         public ToggleNode RMousePos { get; set; } = new ToggleNode(false);
         public ToggleNode AimPlayers { get; set; } = new ToggleNode(true);

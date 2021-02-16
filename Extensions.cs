@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using ExileCore.PoEMemory.Components;
-using ExileCore.PoEMemory.FilesInMemory;
 using ExileCore.PoEMemory.MemoryObjects;
 using ExileCore.Shared.Enums;
 using SharpDX;
@@ -19,6 +17,19 @@ namespace EssenceDrainContagion
                    entity.GetComponent<Life>().Buffs.Any(b => contains ? b.Name.Contains(buff) : b.Name == buff);
         }
 
+        public static bool HaveStat(Entity entity, GameStat stat)
+        {
+            try
+            {
+                var result = entity?.GetComponent<Stats>()?.StatDictionary?[stat];
+                return result > 0;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+        
         public static bool IsInside(this Vector2 position, RectangleF container)
         {
             return position.Y + PixelBorder < container.Bottom
@@ -38,21 +49,6 @@ namespace EssenceDrainContagion
             {
                 return Int32.MaxValue;
             }
-        }
-
-        public static int GetStatValue(this Entity entity, string playerStat,  IDictionary<string, StatsDat.StatRecord> recordsByIdentifier)
-        {
-            if (!recordsByIdentifier.TryGetValue(playerStat, out var startRecord))
-            {
-                return 0;
-            }
-
-            if (!entity.GetComponent<Stats>().StatDictionary.TryGetValue((GameStat) startRecord.ID, out var statValue))
-            {
-                return 0;
-            }
-
-            return statValue;
         }
     }
 }

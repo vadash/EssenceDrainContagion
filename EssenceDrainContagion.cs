@@ -1,26 +1,25 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Windows.Forms;
 using ExileCore;
 using ExileCore.PoEMemory.Components;
-using ExileCore.PoEMemory.FilesInMemory;
 using ExileCore.PoEMemory.MemoryObjects;
+using ExileCore.Shared;
 using ExileCore.Shared.Enums;
+using ExileCore.Shared.Helpers;
 using SharpDX;
 
 namespace EssenceDrainContagion
 {
     public class EssenceDrainContagion : BaseSettingsPlugin<EssenceDrainContagionSettings>
     {
-        private readonly Stopwatch _aimTimer = Stopwatch.StartNew();
-        private readonly List<Entity> _entities = new List<Entity>();
-        private IDictionary<string, StatsDat.StatRecord> _statRecords;
         private bool _aiming;
         private Vector2 _oldMousePos;
         private HashSet<string> _ignoredMonsters;
+        private Coroutine _mainCoroutine;
+        private Tuple<float, Entity> _bestTarget;
 
         private readonly string[] _ignoredBuffs = {
             "capture_monster_captured",
@@ -55,8 +54,79 @@ namespace EssenceDrainContagion
         public override bool Initialise()
         {
             LoadIgnoredMonsters($@"{DirectoryFullName}\Ignored Monsters.txt");
-            _statRecords = GameController.Files.Stats.records;
+            Input.RegisterKey(Settings.AimKey);
+            _mainCoroutine = new Coroutine(
+                MainCoroutine(),
+                this,
+                "EDC");
+            Core.ParallelRunner.Run(_mainCoroutine);
             return true;
+        }
+
+        private IEnumerator MainCoroutine()
+        {
+            while (true)
+            {
+                try
+                {
+                    if (!ValidTarget(_bestTarget?.Item2)) _bestTarget = ScanValidMonsters()?.FirstOrDefault();
+                }
+                catch
+                {
+                    // ignored
+                }
+
+                if (!Input.IsKeyDown(Settings.AimKey)) 
+                    _oldMousePos = Input.MousePosition;
+                if (Input.IsKeyDown(Settings.AimKey)
+                    && !GameController.Game.IngameState.IngameUi.InventoryPanel.IsVisible
+                    && !GameController.Game.IngameState.IngameUi.OpenLeftPanel.IsVisible)
+                {
+                    _aiming = true;
+                    yield return Attack();
+                }
+
+                if (!Input.IsKeyDown(Settings.AimKey) && _aiming)
+                {
+                    Input.SetCursorPos(_oldMousePos);
+                    _aiming = false;
+                }
+
+                yield return new WaitTime(25);
+            }
+            // ReSharper disable once IteratorNeverReturns
+        }
+
+        private bool ValidTarget(Entity entity)
+        {
+            try
+            {
+                return entity != null &&
+                       entity.IsValid &&
+                       entity.IsAlive &&
+                       entity.IsHostile &&
+                       entity.HasComponent<Monster>() &&
+                       entity.HasComponent<Targetable>() &&
+                       entity.HasComponent<Life>() &&
+                       entity.GetComponent<Life>().CurHP / (float) entity.GetComponent<Life>().MaxHP > 0.25f &&
+                       entity.DistancePlayer < Settings.AimRangeGrid &&
+                       GameController.Window.GetWindowRectangleTimeCache.Contains(
+                           GameController.Game.IngameState.Camera.WorldToScreen(entity.Pos));
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public override void Render()
+        {
+            if (_bestTarget != null)
+            {
+                var position = GameController.Game.IngameState.Camera.WorldToScreen(_bestTarget.Item2.Pos);
+                Graphics.DrawFrame(position, position.Translate(20, 20), Color.Chocolate, 3);
+            }
+            base.Render();
         }
 
         private void LoadIgnoredMonsters(string fileName)
@@ -73,64 +143,30 @@ namespace EssenceDrainContagion
                     _ignoredMonsters.Add(line.Trim().ToLower());
         }
 
-        public override void Render()
+        private IEnumerator Attack()
         {
-            if (_aimTimer.ElapsedMilliseconds < 100) return;
-
-            try
-            {
-                if (!Input.IsKeyDown(Keys.RButton)) 
-                    _oldMousePos = Input.MousePosition;
-                if (Input.IsKeyDown(Keys.RButton)
-                    && !GameController.Game.IngameState.IngameUi.InventoryPanel.IsVisible
-                    && !GameController.Game.IngameState.IngameUi.OpenLeftPanel.IsVisible)
-                {
-                    _aiming = true;
-                    var bestTarget = ScanValidMonsters()?.FirstOrDefault();
-                    Attack(bestTarget);
-                }
-                if (!Input.IsKeyDown(Keys.RButton) && _aiming) 
-                    Input.SetCursorPos(_oldMousePos);
-                _aiming = false;
-            }
-            catch (Exception e)
-            {
-                LogError("Something went wrong? " + e, 5);
-            }
-
-            _aimTimer.Restart();
-        }
-
-        public override void EntityAdded(Entity entityWrapper) { _entities.Add(entityWrapper); }
-
-        public override void EntityRemoved(Entity entityWrapper) { _entities.Remove(entityWrapper); }
-
-        private void Attack(Tuple<float, Entity> bestTarget)
-        {
-            if (bestTarget == null) return;
-            var position = GameController.Game.IngameState.Camera.WorldToScreen(bestTarget.Item2.Pos);
-            var windowRectangle = GameController.Window.GetWindowRectangle();
-            if (!position.IsInside(windowRectangle)) return;
-            var offset = GameController.Window.GetWindowRectangle().TopLeft;
-            Input.SetCursorPos(position + offset);
-            Input.KeyPressRelease(bestTarget.Item2.HasBuff("contagion", true) ? Settings.EssenceDrainKey.Value : Settings.ContagionKey.Value);
+            if (_bestTarget == null) yield break;
+            var position = GameController.Game.IngameState.Camera.WorldToScreen(_bestTarget.Item2.Pos);
+            Input.SetCursorPos(position);
+            yield return Input.KeyPress(_bestTarget.Item2.HasBuff("contagion", true) ? Settings.EssenceDrainKey.Value : Settings.ContagionKey.Value);
         }
 
         private IEnumerable<Tuple<float, Entity>> ScanValidMonsters()
         {
-            return _entities?.Where(x => 
-                    x.HasComponent<Monster>() &&
-                    x.IsAlive &&
-                    x.IsHostile &&
-                    x.GetStatValue("ignored_by_enemy_target_selection", _statRecords) == 0 &&
-                    x.GetStatValue("cannot_die", _statRecords) == 0 &&
-                    x.GetStatValue("cannot_be_damaged", _statRecords) == 0 &&
-                    !_ignoredBuffs.Any(b => x.HasBuff(b)) &&
-                    !_ignoredMonsters.Any(im => x.Path.ToLower().Contains(im))
-                )
-                .Select(x => new Tuple<float, Entity>(ComputeWeight(x), x))
-                .Where(x => x.Item1 < Settings.AimRange)
-                .OrderByDescending(x => x.Item1);
+            var queue =
+                from entity in GameController.Entities
+                where ValidTarget(entity)
+                let stats = entity.GetComponent<Stats>()
+                where !Extensions.HaveStat(entity, GameStat.CannotDie) &&
+                      !Extensions.HaveStat(entity, GameStat.CannotBeDamaged) &&
+                      !Extensions.HaveStat(entity, GameStat.IgnoredByEnemyTargetSelection) &&
+                      !_ignoredBuffs.Any(b => entity.HasBuff(b)) &&
+                      !_ignoredMonsters.Any(im => entity.Path.ToLower().Contains(im))
+                let weight = ComputeWeight(entity)
+                orderby weight descending
+                select new Tuple<float, Entity>(weight, entity);
+
+            return queue;
         }
 
         private float ComputeWeight(Entity entity)
