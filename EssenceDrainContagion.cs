@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using ExileCore;
@@ -19,7 +20,8 @@ namespace EssenceDrainContagion
         private Vector2 _oldMousePos;
         private HashSet<string> _ignoredMonsters;
         private Coroutine _mainCoroutine;
-        private Tuple<float, Entity> _bestTarget;
+        private Tuple<float, Entity> _currentTarget;
+        private Stopwatch _lastTargetSwap = new Stopwatch();
 
         private readonly string[] _ignoredBuffs = {
             "capture_monster_captured",
@@ -69,7 +71,18 @@ namespace EssenceDrainContagion
             {
                 try
                 {
-                    if (!ValidTarget(_bestTarget?.Item2)) _bestTarget = ScanValidMonsters()?.FirstOrDefault();
+                    if (_currentTarget == null ||
+                        !ValidTarget(_currentTarget?.Item2))
+                    {
+                        _currentTarget = ScanValidMonsters()?.FirstOrDefault();
+                        _lastTargetSwap.Restart();
+                    }
+                    else if (_lastTargetSwap.ElapsedMilliseconds > 100)
+                    {
+                        var best = ScanValidMonsters()?.FirstOrDefault();
+                        if (best?.Item1 > 1.2f * _currentTarget?.Item1) _currentTarget = best;
+                        _lastTargetSwap.Restart();
+                    }
                 }
                 catch
                 {
@@ -92,7 +105,7 @@ namespace EssenceDrainContagion
                     _aiming = false;
                 }
 
-                yield return new WaitTime(25);
+                yield return new WaitTime(10);
             }
             // ReSharper disable once IteratorNeverReturns
         }
@@ -104,11 +117,12 @@ namespace EssenceDrainContagion
                 return entity != null &&
                        entity.IsValid &&
                        entity.IsAlive &&
-                       entity.IsHostile &&
                        entity.HasComponent<Monster>() &&
+                       entity.IsHostile &&
                        entity.HasComponent<Targetable>() &&
+                       entity.GetComponent<Targetable>().isTargetable &&
                        entity.HasComponent<Life>() &&
-                       entity.GetComponent<Life>().CurHP / (float) entity.GetComponent<Life>().MaxHP > 0.25f &&
+                       entity.GetComponent<Life>().CurHP > 0 &&
                        entity.DistancePlayer < Settings.AimRangeGrid &&
                        GameController.Window.GetWindowRectangleTimeCache.Contains(
                            GameController.Game.IngameState.Camera.WorldToScreen(entity.Pos));
@@ -121,9 +135,9 @@ namespace EssenceDrainContagion
 
         public override void Render()
         {
-            if (_bestTarget != null)
+            if (_currentTarget != null)
             {
-                var position = GameController.Game.IngameState.Camera.WorldToScreen(_bestTarget.Item2.Pos);
+                var position = GameController.Game.IngameState.Camera.WorldToScreen(_currentTarget.Item2.Pos);
                 Graphics.DrawFrame(position, position.Translate(20, 20), Color.Chocolate, 3);
             }
             base.Render();
@@ -145,18 +159,17 @@ namespace EssenceDrainContagion
 
         private IEnumerator Attack()
         {
-            if (_bestTarget == null) yield break;
-            var position = GameController.Game.IngameState.Camera.WorldToScreen(_bestTarget.Item2.Pos);
+            if (_currentTarget == null) yield break;
+            var position = GameController.Game.IngameState.Camera.WorldToScreen(_currentTarget.Item2.Pos);
             Input.SetCursorPos(position);
-            yield return Input.KeyPress(_bestTarget.Item2.HasBuff("contagion", true) ? Settings.EssenceDrainKey.Value : Settings.ContagionKey.Value);
+            yield return Input.KeyPress(_currentTarget.Item2.HasBuff("contagion", true) ? Settings.EssenceDrainKey.Value : Settings.ContagionKey.Value);
         }
 
         private IEnumerable<Tuple<float, Entity>> ScanValidMonsters()
         {
             var queue =
-                from entity in GameController.Entities
+                from entity in GameController?.EntityListWrapper?.ValidEntitiesByType?[EntityType.Monster]
                 where ValidTarget(entity)
-                let stats = entity.GetComponent<Stats>()
                 where !Extensions.HaveStat(entity, GameStat.CannotDie) &&
                       !Extensions.HaveStat(entity, GameStat.CannotBeDamaged) &&
                       !Extensions.HaveStat(entity, GameStat.IgnoredByEnemyTargetSelection) &&
@@ -165,14 +178,24 @@ namespace EssenceDrainContagion
                 let weight = ComputeWeight(entity)
                 orderby weight descending
                 select new Tuple<float, Entity>(weight, entity);
-
             return queue;
         }
 
         private float ComputeWeight(Entity entity)
         {
             var weight = 0;
-            weight -= GameController.Player.DistanceFrom(entity) / 10;
+            if (Settings.ClosestToMouse)
+            {
+                var p1 = Input.MousePosition;
+                var p2 = GameController.Game.IngameState.Camera.WorldToScreen(entity.Pos);
+                weight -= (int) (p1.Distance(p2) / 10f);
+            }
+            else
+            {
+                var p1 = GameController.Game.IngameState.Camera.WorldToScreen(GameController.Player.Pos);
+                var p2 = GameController.Game.IngameState.Camera.WorldToScreen(entity.Pos);
+                weight -= (int) (p1.Distance(p2) / 10f);
+            }
 
             if (entity.GetComponent<Life>().HasBuff("contagion")) weight += Settings.HasContagionWeight;
             if (entity.GetComponent<Life>().HasBuff("capture_monster_trapped")) weight += Settings.capture_monster_trapped;
