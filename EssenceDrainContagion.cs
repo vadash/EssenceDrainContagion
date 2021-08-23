@@ -23,34 +23,35 @@ namespace EssenceDrainContagion
         private Tuple<float, Entity> _currentTarget;
         private Stopwatch _lastTargetSwap = new Stopwatch();
 
-        private readonly string[] _ignoredBuffs = {
+        private readonly string[] _ignoredBuffs =
+        {
             "capture_monster_captured",
             "capture_monster_disappearing"
         };
 
         private readonly string[] _lightLessGrub =
-            {
-                "Metadata/Monsters/HuhuGrub/AbyssGrubMobile",
-                "Metadata/Monsters/HuhuGrub/AbyssGrubMobileMinion"
+        {
+            "Metadata/Monsters/HuhuGrub/AbyssGrubMobile",
+            "Metadata/Monsters/HuhuGrub/AbyssGrubMobileMinion"
         };
-        
+
         private readonly string[] _raisedZombie =
         {
-                "Metadata/Monsters/RaisedZombies/RaisedZombieStandard",
-                "Metadata/Monsters/RaisedZombies/RaisedZombieMummy",
-                "Metadata/Monsters/RaisedZombies/NecromancerRaisedZombieStandard"
+            "Metadata/Monsters/RaisedZombies/RaisedZombieStandard",
+            "Metadata/Monsters/RaisedZombies/RaisedZombieMummy",
+            "Metadata/Monsters/RaisedZombies/NecromancerRaisedZombieStandard"
         };
 
         private readonly string[] _summonedSkeleton =
         {
-                "Metadata/Monsters/RaisedSkeletons/RaisedSkeletonStandard",
-                "Metadata/Monsters/RaisedSkeletons/RaisedSkeletonStatue",
-                "Metadata/Monsters/RaisedSkeletons/RaisedSkeletonMannequin",
-                "Metadata/Monsters/RaisedSkeletons/RaisedSkeletonStatueMale",
-                "Metadata/Monsters/RaisedSkeletons/RaisedSkeletonStatueGold",
-                "Metadata/Monsters/RaisedSkeletons/RaisedSkeletonStatueGoldMale",
-                "Metadata/Monsters/RaisedSkeletons/NecromancerRaisedSkeletonStandard",
-                "Metadata/Monsters/RaisedSkeletons/TalismanRaisedSkeletonStandard"
+            "Metadata/Monsters/RaisedSkeletons/RaisedSkeletonStandard",
+            "Metadata/Monsters/RaisedSkeletons/RaisedSkeletonStatue",
+            "Metadata/Monsters/RaisedSkeletons/RaisedSkeletonMannequin",
+            "Metadata/Monsters/RaisedSkeletons/RaisedSkeletonStatueMale",
+            "Metadata/Monsters/RaisedSkeletons/RaisedSkeletonStatueGold",
+            "Metadata/Monsters/RaisedSkeletons/RaisedSkeletonStatueGoldMale",
+            "Metadata/Monsters/RaisedSkeletons/NecromancerRaisedSkeletonStandard",
+            "Metadata/Monsters/RaisedSkeletons/TalismanRaisedSkeletonStandard"
         };
 
         public override bool Initialise()
@@ -89,7 +90,7 @@ namespace EssenceDrainContagion
                     // ignored
                 }
 
-                if (!Input.IsKeyDown(Settings.AimKey)) 
+                if (!Input.IsKeyDown(Settings.AimKey))
                     _oldMousePos = Input.MousePosition;
                 if (Input.IsKeyDown(Settings.AimKey)
                     && !GameController.Game.IngameState.IngameUi.InventoryPanel.IsVisible
@@ -140,6 +141,7 @@ namespace EssenceDrainContagion
                 var position = GameController.Game.IngameState.Camera.WorldToScreen(_currentTarget.Item2.Pos);
                 Graphics.DrawFrame(position, position.Translate(20, 20), Color.Chocolate, 3);
             }
+
             base.Render();
         }
 
@@ -162,7 +164,9 @@ namespace EssenceDrainContagion
             if (_currentTarget == null) yield break;
             var position = GameController.Game.IngameState.Camera.WorldToScreen(_currentTarget.Item2.Pos);
             Input.SetCursorPos(position);
-            yield return Input.KeyPress(_currentTarget.Item2.HasBuff("contagion", true) ? Settings.EssenceDrainKey.Value : Settings.ContagionKey.Value);
+            yield return Input.KeyPress(_currentTarget.Item2.HasBuff("contagion", true)
+                ? Settings.EssenceDrainKey.Value
+                : Settings.ContagionKey.Value);
         }
 
         private IEnumerable<Tuple<float, Entity>> ScanValidMonsters()
@@ -197,10 +201,12 @@ namespace EssenceDrainContagion
                 weight -= (int) (p1.Distance(p2) / 10f);
             }
 
-            if (entity.GetComponent<Life>().HasBuff("contagion")) weight += Settings.HasContagionWeight;
-            if (entity.GetComponent<Life>().HasBuff("capture_monster_trapped")) weight += Settings.capture_monster_trapped;
-            if (entity.GetComponent<Life>().HasBuff("harbinger_minion_new")) weight += Settings.HarbingerMinionWeight;
-            if (entity.GetComponent<Life>().HasBuff("capture_monster_enraged")) weight += Settings.capture_monster_enraged;
+            if (entity.GetComponent<Buffs>().HasBuff("contagion")) weight += Settings.HasContagionWeight;
+            if (entity.GetComponent<Buffs>().HasBuff("capture_monster_trapped"))
+                weight += Settings.capture_monster_trapped;
+            if (entity.GetComponent<Buffs>().HasBuff("harbinger_minion_new")) weight += Settings.HarbingerMinionWeight;
+            if (entity.GetComponent<Buffs>().HasBuff("capture_monster_enraged"))
+                weight += Settings.capture_monster_enraged;
             if (entity.Path.Contains("/BeastHeart")) weight += Settings.BeastHearts;
             if (entity.Path == "Metadata/Monsters/Tukohama/TukohamaShieldTotem") weight += Settings.TukohamaShieldTotem;
 
@@ -232,5 +238,4 @@ namespace EssenceDrainContagion
             return weight;
         }
     }
-
 }

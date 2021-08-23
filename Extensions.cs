@@ -3,7 +3,6 @@ using System.Linq;
 using ExileCore.PoEMemory.Components;
 using ExileCore.PoEMemory.MemoryObjects;
 using ExileCore.Shared.Enums;
-using SharpDX;
 
 namespace EssenceDrainContagion
 {
@@ -11,8 +10,8 @@ namespace EssenceDrainContagion
     {
         public static bool HasBuff(this Entity entity, string buff, bool contains = false)
         {
-            return entity.HasComponent<Life>() &&
-                   entity.GetComponent<Life>().Buffs.Any(b => contains ? b.Name.Contains(buff) : b.Name == buff);
+            return entity.HasComponent<Buffs>() &&
+                   entity.GetComponent<Buffs>().BuffsList.Any(b => contains ? b.Name.Contains(buff) : b.Name == buff);
         }
 
         public static bool HaveStat(Entity entity, GameStat stat)
